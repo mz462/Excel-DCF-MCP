@@ -1,4 +1,11 @@
 from typing import Optional, List, Set
+import threading
+import time
+
+try:
+    import pythoncom  # type: ignore
+except ImportError:  # Not on Windows or pywin32 not installed
+    pythoncom = None
 
 try:
     import win32com.client as win32
@@ -11,6 +18,38 @@ from fastmcp.server import FastMCP
 server = FastMCP(name="excel-mcp")
 
 excel_app = None
+_excel_event_handler = None
+_event_thread = None
+_event_stop = threading.Event()
+
+
+class _ExcelEventSink:
+    """Simple event sink for Excel Application events."""
+
+    def __init__(self):
+        self.events: List[dict] = []
+
+    def OnSheetChange(self, sh, target):  # pylint: disable=invalid-name
+        addr = f"{sh.Name}!{target.Address(False, False)}"
+        self.events.append({
+            "event": "SheetChange",
+            "sheet": sh.Name,
+            "address": addr,
+        })
+
+    def OnSheetCalculate(self, sh):  # pylint: disable=invalid-name
+        self.events.append({
+            "event": "SheetCalculate",
+            "sheet": sh.Name,
+        })
+
+
+def _event_loop():
+    if pythoncom is None:
+        return
+    while not _event_stop.is_set():
+        pythoncom.PumpWaitingMessages()
+        time.sleep(0.1)
 
 @server.tool
 def initialize_excel_link(workbook: Optional[str] = None):
@@ -288,6 +327,51 @@ def build_label_address_map(sheet_name: Optional[str], scan_range: Optional[str]
         }
     except Exception as e:
         return {"status": "failure", "reason": str(e)}
+
+
+@server.tool
+def start_excel_event_monitor():
+    """Begin monitoring Excel events to record changes."""
+    global _excel_event_handler, _event_thread
+    if win32 is None or pythoncom is None:
+        return {"status": "failure", "reason": "pywin32 not available"}
+
+    if excel_app is None:
+        return {"status": "failure", "reason": "excel link not initialized"}
+
+    if _event_thread and _event_thread.is_alive():
+        return {"status": "running"}
+
+    _excel_event_handler = win32.WithEvents(excel_app, _ExcelEventSink)
+    _event_stop.clear()
+    _event_thread = threading.Thread(target=_event_loop, daemon=True)
+    _event_thread.start()
+    return {"status": "started"}
+
+
+@server.tool
+def stop_excel_event_monitor():
+    """Stop monitoring Excel events."""
+    global _excel_event_handler, _event_thread
+    if _event_thread is None:
+        return {"status": "not_running"}
+
+    _event_stop.set()
+    _event_thread.join()
+    _event_thread = None
+    _excel_event_handler = None
+    return {"status": "stopped"}
+
+
+@server.tool
+def fetch_excel_events():
+    """Retrieve and clear recorded Excel events."""
+    if _excel_event_handler is None:
+        return {"status": "failure", "reason": "event monitor not running"}
+
+    events = list(_excel_event_handler.events)
+    _excel_event_handler.events.clear()
+    return {"status": "success", "events": events}
 
 
 if __name__ == "__main__":
