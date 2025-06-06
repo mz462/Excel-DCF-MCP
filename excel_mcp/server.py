@@ -162,6 +162,66 @@ def trace_dependents(sheet_name: Optional[str], cell_address: str):
         return {"status": "failure", "reason": str(e)}
 
 
+def _adjacent_text_labels(cell, radius: int) -> List[str]:
+    """Return text values in cells near the target cell."""
+    labels: List[str] = []
+    for row_offset in range(-radius, radius + 1):
+        for col_offset in range(-radius, radius + 1):
+            if row_offset == 0 and col_offset == 0:
+                continue
+            try:
+                adj = cell.Offset(row_offset, col_offset)
+                if adj.Formula == "" and isinstance(adj.Value, str) and adj.Value.strip() != "":
+                    labels.append(str(adj.Value).strip())
+            except Exception:
+                continue
+    return labels
+
+
+@server.tool
+def find_cell_labels(sheet_name: Optional[str], cell_address: str, search_radius: int = 1):
+    """Attempt to identify human-readable labels for a given cell."""
+    if win32 is None:
+        return {"status": "failure", "reason": "pywin32 not available"}
+
+    if excel_app is None:
+        return {"status": "failure", "reason": "excel link not initialized"}
+
+    try:
+        wb = excel_app.ActiveWorkbook
+        ws = wb.Worksheets(sheet_name) if sheet_name else wb.ActiveSheet
+        cell = ws.Range(cell_address)
+
+        labels: List[str] = []
+
+        # Adjacent text values
+        labels.extend(_adjacent_text_labels(cell, search_radius))
+
+        # Named ranges including the cell
+        try:
+            for n in wb.Names:
+                try:
+                    rng = n.RefersToRange
+                except Exception:
+                    continue
+                try:
+                    if cell.Address in rng.Address:
+                        labels.append(n.Name)
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        return {
+            "status": "success",
+            "sheet": ws.Name,
+            "address": cell_address,
+            "labels": sorted(set(labels)),
+        }
+    except Exception as e:
+        return {"status": "failure", "reason": str(e)}
+
+
 if __name__ == "__main__":
     # Run server using HTTP transport by default
     server.run(transport="streamable-http")
