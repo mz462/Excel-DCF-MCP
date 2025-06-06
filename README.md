@@ -15,3 +15,16 @@ Run the server:
 ```
 python -m excel_mcp.server
 ```
+
+## Running Tests
+
+Unit tests are located in the `tests` directory and can be executed with:
+
+```
+python -m unittest discover -s tests
+```
+
+## Example
+
+A minimal example script is available in `examples/basic_usage.py` which starts
+the MCP server using the default HTTP transport.
