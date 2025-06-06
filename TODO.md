@@ -3,7 +3,7 @@
 1. **Project setup and initialization** - create server skeleton with `initialize_excel_link` tool. *(Done)*
 2. Implement `get_formula` tool to retrieve a cell formula. *(Done)*
 3. Implement `trace_precedents` tool. *(Done)*
-4. Implement `trace_dependents` tool.
+4. Implement `trace_dependents` tool. *(Done)*
 5. Implement `find_cell_labels` tool and helper logic.
 6. Implement `build_label_address_map` function and tool.
 7. Add Excel event handling or polling.

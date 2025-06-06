@@ -115,6 +115,53 @@ def trace_precedents(sheet_name: Optional[str], cell_address: str):
         return {"status": "failure", "reason": str(e)}
 
 
+@server.tool
+def trace_dependents(sheet_name: Optional[str], cell_address: str):
+    """Return all dependent cell addresses for a given cell."""
+    if win32 is None:
+        return {"status": "failure", "reason": "pywin32 not available"}
+
+    if excel_app is None:
+        return {"status": "failure", "reason": "excel link not initialized"}
+
+    try:
+        wb = excel_app.ActiveWorkbook
+        ws = wb.Worksheets(sheet_name) if sheet_name else wb.ActiveSheet
+        start_cell = ws.Range(cell_address)
+
+        addresses: Set[str] = set()
+
+        def _collect_dependents(rng):
+            try:
+                deps = rng.Dependents
+            except Exception:
+                return
+            try:
+                for cell in deps:
+                    addr = f"{cell.Worksheet.Name}!{cell.Address(False, False)}"
+                    if addr not in addresses:
+                        addresses.add(addr)
+                        _collect_dependents(cell)
+            except TypeError:
+                # If deps is a single cell range, iteration may fail
+                cell = deps
+                addr = f"{cell.Worksheet.Name}!{cell.Address(False, False)}"
+                if addr not in addresses:
+                    addresses.add(addr)
+                    _collect_dependents(cell)
+
+        _collect_dependents(start_cell)
+
+        return {
+            "status": "success",
+            "sheet": ws.Name,
+            "address": cell_address,
+            "dependents": sorted(addresses),
+        }
+    except Exception as e:
+        return {"status": "failure", "reason": str(e)}
+
+
 if __name__ == "__main__":
     # Run server using HTTP transport by default
     server.run(transport="streamable-http")
