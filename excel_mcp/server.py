@@ -37,6 +37,37 @@ def initialize_excel_link(workbook: Optional[str] = None):
     }
 
 
+@server.tool
+def get_formula(sheet_name: Optional[str], cell_address: str):
+    """Return the formula from a cell or the value if no formula exists."""
+    if win32 is None:
+        return {"status": "failure", "reason": "pywin32 not available"}
+
+    if excel_app is None:
+        return {"status": "failure", "reason": "excel link not initialized"}
+
+    try:
+        wb = excel_app.ActiveWorkbook
+        ws = wb.Worksheets(sheet_name) if sheet_name else wb.ActiveSheet
+        cell = ws.Range(cell_address)
+        formula = cell.Formula
+        if formula == "":
+            return {
+                "status": "success",
+                "sheet": ws.Name,
+                "address": cell_address,
+                "value": cell.Value,
+            }
+        return {
+            "status": "success",
+            "sheet": ws.Name,
+            "address": cell_address,
+            "formula": formula,
+        }
+    except Exception as e:
+        return {"status": "failure", "reason": str(e)}
+
+
 if __name__ == "__main__":
     # Run server using HTTP transport by default
     server.run(transport="streamable-http")
