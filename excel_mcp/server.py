@@ -1,4 +1,4 @@
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Dict
 
 try:
     import win32com.client as win32
@@ -111,6 +111,60 @@ def trace_precedents(sheet_name: Optional[str], cell_address: str):
             "address": cell_address,
             "precedents": sorted(addresses),
         }
+    except Exception as e:
+        return {"status": "failure", "reason": str(e)}
+
+
+@server.tool
+def build_label_address_map(sheet_name: Optional[str], scan_range: Optional[str] = None):
+    """Return a mapping of text labels to nearby data cell addresses."""
+    if win32 is None:
+        return {"status": "failure", "reason": "pywin32 not available"}
+
+    if excel_app is None:
+        return {"status": "failure", "reason": "excel link not initialized"}
+
+    try:
+        wb = excel_app.ActiveWorkbook
+        ws = wb.Worksheets(sheet_name) if sheet_name else wb.ActiveSheet
+
+        scan_rng = ws.Range(scan_range) if scan_range else ws.UsedRange
+
+        label_map: Dict[str, str] = {}
+
+        for cell in scan_rng:
+            if isinstance(cell.Value, str) and cell.Value.strip():
+                label = cell.Value.strip()
+                target = None
+                try:
+                    right = cell.Offset(0, 1)
+                    if right.Value not in (None, "") and not isinstance(right.Value, str):
+                        target = right
+                except Exception:
+                    pass
+                if target is None:
+                    try:
+                        below = cell.Offset(1, 0)
+                        if below.Value not in (None, "") and not isinstance(below.Value, str):
+                            target = below
+                    except Exception:
+                        pass
+
+                if target is not None:
+                    addr = f"{target.Worksheet.Name}!{target.Address(False, False)}"
+                    label_map[label] = addr
+
+        # Include named ranges
+        for name in wb.Names:
+            try:
+                refers = name.RefersToRange
+                if refers.Worksheet.Name == ws.Name:
+                    addr = f"{refers.Worksheet.Name}!{refers.Address(False, False)}"
+                    label_map[name.Name] = addr
+            except Exception:
+                continue
+
+        return {"status": "success", "sheet": ws.Name, "label_map": label_map}
     except Exception as e:
         return {"status": "failure", "reason": str(e)}
 
