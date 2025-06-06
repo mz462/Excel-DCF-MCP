@@ -222,6 +222,74 @@ def find_cell_labels(sheet_name: Optional[str], cell_address: str, search_radius
         return {"status": "failure", "reason": str(e)}
 
 
+@server.tool
+def build_label_address_map(sheet_name: Optional[str], scan_range: Optional[str] = None):
+    """Return a heuristic mapping of labels to cell addresses for a worksheet."""
+    if win32 is None:
+        return {"status": "failure", "reason": "pywin32 not available"}
+
+    if excel_app is None:
+        return {"status": "failure", "reason": "excel link not initialized"}
+
+    try:
+        wb = excel_app.ActiveWorkbook
+        ws = wb.Worksheets(sheet_name) if sheet_name else wb.ActiveSheet
+
+        rng = ws.Range(scan_range) if scan_range else ws.UsedRange
+
+        label_map = {}
+
+        first_row = rng.Row
+        first_col = rng.Column
+        rows = rng.Rows.Count
+        cols = rng.Columns.Count
+
+        for r in range(rows):
+            for c in range(cols):
+                cell = ws.Cells(first_row + r, first_col + c)
+                if cell.Formula == "" and isinstance(cell.Value, str) and cell.Value.strip() != "":
+                    label = str(cell.Value).strip()
+                    right = cell.Offset(0, 1)
+                    below = cell.Offset(1, 0)
+                    target = None
+                    try:
+                        if right.Formula != "" or (right.Formula == "" and isinstance(right.Value, (int, float))):
+                            target = right
+                    except Exception:
+                        pass
+                    if target is None:
+                        try:
+                            if below.Formula != "" or (below.Formula == "" and isinstance(below.Value, (int, float))):
+                                target = below
+                        except Exception:
+                            pass
+                    if target is not None:
+                        addr = f"{target.Worksheet.Name}!{target.Address(False, False)}"
+                        if label not in label_map:
+                            label_map[label] = addr
+
+        # Include named ranges
+        try:
+            for n in wb.Names:
+                try:
+                    cell = n.RefersToRange.Cells(1, 1)
+                    addr = f"{cell.Worksheet.Name}!{cell.Address(False, False)}"
+                    if n.Name not in label_map:
+                        label_map[n.Name] = addr
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
+        return {
+            "status": "success",
+            "sheet": ws.Name,
+            "label_map": label_map,
+        }
+    except Exception as e:
+        return {"status": "failure", "reason": str(e)}
+
+
 if __name__ == "__main__":
     # Run server using HTTP transport by default
     server.run(transport="streamable-http")
