@@ -2,6 +2,8 @@ from typing import Optional, List, Set
 import threading
 import time
 
+from . import db
+
 try:
     import pythoncom  # type: ignore
 except ImportError:  # Not on Windows or pywin32 not installed
@@ -50,6 +52,15 @@ def _event_loop():
     while not _event_stop.is_set():
         pythoncom.PumpWaitingMessages()
         time.sleep(0.1)
+
+@server.tool
+def initialize_database(path: str = "excel_mcp.db"):
+    """Initialize persistent DuckDB storage."""
+    try:
+        db.init_db(path)
+        return {"status": "success", "path": path}
+    except Exception as e:  # pragma: no cover - simple wrapper
+        return {"status": "failure", "reason": str(e)}
 
 @server.tool
 def initialize_excel_link(workbook: Optional[str] = None):
@@ -320,12 +331,24 @@ def build_label_address_map(sheet_name: Optional[str], scan_range: Optional[str]
         except Exception:
             pass
 
+        db.store_label_map(ws.Name, label_map)
         return {
             "status": "success",
             "sheet": ws.Name,
             "label_map": label_map,
         }
     except Exception as e:
+        return {"status": "failure", "reason": str(e)}
+
+
+@server.tool
+def query_label(label: str):
+    """Query stored label mappings from the database."""
+    try:
+        rows = db.query_label(label)
+        results = [{"sheet": r[0], "address": r[1]} for r in rows]
+        return {"status": "success", "results": results}
+    except Exception as e:  # pragma: no cover - simple wrapper
         return {"status": "failure", "reason": str(e)}
 
 

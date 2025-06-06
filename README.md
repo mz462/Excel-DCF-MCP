@@ -10,6 +10,7 @@ Currently implemented:
 - `find_cell_labels` tool to guess human-readable labels for a cell.
 - `build_label_address_map` tool to map labels to data cell addresses.
 - Excel event monitoring tools to capture cell changes.
+- DuckDB persistence for label mappings (`initialize_database`, `query_label`).
 
 Run the server:
 ```
