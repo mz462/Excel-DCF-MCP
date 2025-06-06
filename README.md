@@ -8,6 +8,7 @@ Currently implemented:
 - `trace_precedents` tool to list all precedent cells for a target cell.
 - `trace_dependents` tool to list all cells that depend on a target cell.
 - `find_cell_labels` tool to guess human-readable labels for a cell.
+- `build_label_address_map` tool to map labels to data cell addresses.
 
 Run the server:
 ```
