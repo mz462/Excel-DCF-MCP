@@ -4,6 +4,8 @@ This project exposes **FastMCP** tools to interact with a running Microsoft Exce
 
 Currently implemented:
 - `initialize_excel_link` tool to connect to Excel (requires Windows with pywin32).
+- `get_formula` tool to read formulas or values from cells.
+- `trace_precedents` tool to list all precedent cells for a target cell.
 
 Run the server:
 ```

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List, Set
 
 try:
     import win32com.client as win32
@@ -63,6 +63,53 @@ def get_formula(sheet_name: Optional[str], cell_address: str):
             "sheet": ws.Name,
             "address": cell_address,
             "formula": formula,
+        }
+    except Exception as e:
+        return {"status": "failure", "reason": str(e)}
+
+
+@server.tool
+def trace_precedents(sheet_name: Optional[str], cell_address: str):
+    """Return all precedent cell addresses for a given cell."""
+    if win32 is None:
+        return {"status": "failure", "reason": "pywin32 not available"}
+
+    if excel_app is None:
+        return {"status": "failure", "reason": "excel link not initialized"}
+
+    try:
+        wb = excel_app.ActiveWorkbook
+        ws = wb.Worksheets(sheet_name) if sheet_name else wb.ActiveSheet
+        start_cell = ws.Range(cell_address)
+
+        addresses: Set[str] = set()
+
+        def _collect_precedents(rng):
+            try:
+                precs = rng.Precedents
+            except Exception:
+                return
+            try:
+                for cell in precs:
+                    addr = f"{cell.Worksheet.Name}!{cell.Address(False, False)}"
+                    if addr not in addresses:
+                        addresses.add(addr)
+                        _collect_precedents(cell)
+            except TypeError:
+                # If precs is a single cell range, iteration may fail
+                cell = precs
+                addr = f"{cell.Worksheet.Name}!{cell.Address(False, False)}"
+                if addr not in addresses:
+                    addresses.add(addr)
+                    _collect_precedents(cell)
+
+        _collect_precedents(start_cell)
+
+        return {
+            "status": "success",
+            "sheet": ws.Name,
+            "address": cell_address,
+            "precedents": sorted(addresses),
         }
     except Exception as e:
         return {"status": "failure", "reason": str(e)}
