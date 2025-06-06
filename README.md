@@ -6,6 +6,7 @@ Currently implemented:
 - `initialize_excel_link` tool to connect to Excel (requires Windows with pywin32).
 - `get_formula` tool to read formulas or values from cells.
 - `trace_precedents` tool to list all precedent cells for a target cell.
+- `find_cell_labels` tool to locate human-readable labels near a cell.
 
 Run the server:
 ```
