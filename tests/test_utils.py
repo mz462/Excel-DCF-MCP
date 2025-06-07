@@ -1,5 +1,11 @@
 import unittest
-from excel_mcp.utils import address_within_ranges, collect_column_outputs, gather_row_outputs
+from excel_mcp.utils import (
+    address_within_ranges,
+    collect_column_outputs,
+    gather_row_outputs,
+    refine_header_cells,
+)
+from openpyxl import Workbook
 
 
 class TestAddressWithinRanges(unittest.TestCase):
@@ -56,6 +62,20 @@ class TestGatherRowOutputs(unittest.TestCase):
             "E1": "stop",
         }
         self.assertEqual(result, expected)
+
+
+class TestRefineHeaderCells(unittest.TestCase):
+    def test_prune_headers_basic(self):
+        wb = Workbook()
+        ws = wb.active
+        ws["B1"] = "Col"
+        ws["A2"] = "Row"
+        ws["B2"] = 42
+
+        col_vals, row_vals, val = refine_header_cells(["B1", "C1"], ["A2", "A3"], "B2", ws)
+        self.assertEqual(col_vals, ["Col"])
+        self.assertEqual(row_vals, ["Row"])
+        self.assertEqual(val, 42)
 
 
 if __name__ == "__main__":
