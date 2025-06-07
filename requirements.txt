@@ -1,3 +1,4 @@
 fastmcp
 pywin32; sys_platform == 'win32'
 duckdb
+openpyxl

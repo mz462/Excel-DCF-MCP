@@ -1,5 +1,9 @@
 import unittest
-from excel_mcp.utils import address_within_ranges, gather_row_context
+from excel_mcp.utils import (
+    address_within_ranges,
+    collect_column_outputs,
+    gather_row_context,
+)
 
 
 class TestAddressWithinRanges(unittest.TestCase):
@@ -38,6 +42,27 @@ class TestGatherRowContext(unittest.TestCase):
         }
         result = gather_row_context(data, "D2")
         expected = {"C2": "z", "B2": "y", "A2": "x", "D2": 10}
+        self.assertEqual(result, expected)
+
+
+class TestCollectColumnOutputs(unittest.TestCase):
+    def test_basic_scan(self):
+        cells = {
+            "A1": {"output": "Header"},
+            "A2": {"output": 5},
+            "A3": {"output": "x", "formula": "=B1"},
+            "A4": {"output": 10},
+            "A5": {"output": "stop"},
+        }
+
+        result = collect_column_outputs(cells, "A4", text_limit=1)
+        expected = {
+            "A3": "x",
+            "A2": 5,
+            "A1": "Header",
+            "A4": 10,
+            "A5": "stop",
+        }
         self.assertEqual(result, expected)
 
 
