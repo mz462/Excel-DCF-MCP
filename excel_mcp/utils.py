@@ -129,3 +129,79 @@ def collect_column_outputs(cells: Dict[str, Dict[str, Any]], anchor: str, text_l
         current += 1
 
     return result
+
+
+def gather_row_outputs(cells: Dict[str, Dict[str, Any]], anchor: str, text_limit: int = 3) -> Dict[str, Any]:
+    """Collect output values from cells in the same row as ``anchor``.
+
+    The function scans left from ``anchor`` until ``text_limit`` consecutive
+    cells that contain neither a formula nor a numeric value are encountered.
+    It then scans right up to the next such cell or a maximum of 10 cells.
+    Only addresses present in ``cells`` are considered.
+
+    Parameters
+    ----------
+    cells:
+        Mapping of addresses to dictionaries with at least an ``output`` key and
+        optionally a ``formula`` key.
+    anchor:
+        Address like ``B10`` that serves as the starting point.
+    text_limit:
+        Number of consecutive text cells allowed when scanning left.
+
+    Returns
+    -------
+    Dict[str, Any]
+        Addresses mapped to their output values.
+    """
+
+    row_idx, col_idx = coordinate_to_tuple(anchor)
+
+    valid = {addr: data for addr, data in cells.items() if data.get("output") is not None}
+
+    collected: Dict[str, Any] = {}
+
+    consecutive_text = 0
+    current = col_idx - 1
+    inspected = 0
+    while current >= 1 and inspected < 100:
+        addr = f"{get_column_letter(current)}{row_idx}"
+        if addr in valid:
+            info = valid[addr]
+            collected[addr] = info["output"]
+            inspected += 1
+            if "formula" not in info:
+                try:
+                    float(info["output"])
+                    numeric = True
+                except (ValueError, TypeError):
+                    numeric = False
+                if not numeric:
+                    consecutive_text += 1
+                    if consecutive_text >= text_limit:
+                        break
+        current -= 1
+
+    if anchor in cells:
+        collected[anchor] = cells[anchor].get("output")
+
+    max_col = max((coordinate_to_tuple(a)[1] for a in valid), default=col_idx)
+    current = col_idx + 1
+    added = 0
+    while current <= max_col and added < 10:
+        addr = f"{get_column_letter(current)}{row_idx}"
+        if addr in valid:
+            info = valid[addr]
+            collected[addr] = info["output"]
+            added += 1
+            if "formula" not in info:
+                try:
+                    float(info["output"])
+                    numeric = True
+                except (ValueError, TypeError):
+                    numeric = False
+                if not numeric:
+                    break
+        current += 1
+
+    return collected
