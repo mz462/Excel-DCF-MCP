@@ -1,6 +1,8 @@
 # Utility helper functions for Excel MCP
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Iterable, Tuple
+from time import perf_counter
 from openpyxl.utils.cell import coordinate_to_tuple, get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
 
 
 def _col_to_index(col: str) -> int:
@@ -205,3 +207,47 @@ def gather_row_outputs(cells: Dict[str, Dict[str, Any]], anchor: str, text_limit
         current += 1
 
     return collected
+
+
+def _filter_column_entries(ws: Worksheet, candidates: Iterable[str], anchor: str, debug: bool = False) -> Tuple[List[Any], Any]:
+    """Return values from ``candidates`` above ``anchor`` in the same column."""
+    anchor_row, anchor_col = coordinate_to_tuple(anchor)
+    values: List[Any] = []
+    for addr in candidates:
+        try:
+            row, col = coordinate_to_tuple(addr)
+        except ValueError:
+            continue
+        if col == anchor_col and row < anchor_row:
+            val = ws[addr].value
+            if val is not None:
+                values.append(val)
+    current = ws[anchor].value
+    return values, current
+
+
+def _filter_row_entries(ws: Worksheet, candidates: Iterable[str], anchor: str, debug: bool = False) -> List[Any]:
+    """Return values from ``candidates`` left of ``anchor`` in the same row."""
+    anchor_row, anchor_col = coordinate_to_tuple(anchor)
+    values: List[Any] = []
+    for addr in candidates:
+        try:
+            row, col = coordinate_to_tuple(addr)
+        except ValueError:
+            continue
+        if row == anchor_row and col < anchor_col:
+            val = ws[addr].value
+            if val is not None:
+                values.append(val)
+    return values
+
+
+def refine_header_cells(column_candidates: Iterable[str], row_candidates: Iterable[str], anchor_cell: str, ws: Worksheet, debug: bool = False) -> Tuple[List[Any], List[Any], Any]:
+    """Trim header candidates around ``anchor_cell`` and return cell value."""
+    start = perf_counter()
+    col_values, cell_val = _filter_column_entries(ws, column_candidates, anchor_cell, debug=debug)
+    row_values = _filter_row_entries(ws, row_candidates, anchor_cell, debug=debug)
+    if debug:
+        duration = perf_counter() - start
+        print(f"refine_header_cells completed in {duration:.4f}s")
+    return col_values, row_values, cell_val
